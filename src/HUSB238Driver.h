@@ -2,7 +2,7 @@
 #ifndef __HUSB238_H__
 #define __HUSB238_H__
 
-#include "arduino.h"
+#include "Arduino.h"
 
 #define HUSB238_I2CAddress (uint8_t)(0x08)
 
