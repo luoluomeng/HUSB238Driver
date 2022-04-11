@@ -147,16 +147,15 @@ void HUSB238_ReadAllReg(HUSB238_reg_t *regs)
 
 HUSB238_PDOList HUSB238_ExtractCap(HUSB238_reg_t *regs)
 {
-    HUSB238_Reg_SRC_PDO *cap = new HUSB238_Reg_SRC_PDO;
+    HUSB238_Reg_SRC_PDO cap;
     HUSB238_PDOList pdoList;
     HUSB238_DetectedVoltage_t pdo;
     for (int i = 0; i < 6; ++i)
     {
-
-        *(uint8_t *)cap = ((uint8_t *)regs)[i + 2];
-        if (cap->bit.SRC_DETECTED)
+        memcpy(&cap, &regs[i + 2], sizeof(uint8_t));
+        if (cap.bit.SRC_DETECTED)
         {
-            float current = bit2current(cap->bit.SRC_CURRENT);
+            float current = bit2current(cap.bit.SRC_CURRENT);
             pdo.detected = true;
             pdo.current = current;
         }
@@ -194,7 +193,7 @@ HUSB238_PDOList HUSB238_ExtractCap(HUSB238_reg_t *regs)
             break;
         }
     }
-    delete cap;
+    return pdoList;
 }
 
 HUSB238_PDOList HUSB238_GetCapabilities()
@@ -224,6 +223,7 @@ void HUSB238_Init(int sda, int scl)
     {
         return;
     }
+    delay(1000);
     i2c_port_t i2c_master_port = I2C_NUM;
     i2c_config_t conf;
     conf.mode = I2C_MODE_MASTER;
@@ -236,6 +236,7 @@ void HUSB238_Init(int sda, int scl)
     i2c_param_config(i2c_master_port, &conf);
     i2c_driver_install(i2c_master_port, conf.mode, I2C_RX_BUF_DISABLE, I2C_TX_BUF_DISABLE, 0);
     HUSB238_GetSrcCap();
+    delay(1000);
     initlized = true;
 }
 
