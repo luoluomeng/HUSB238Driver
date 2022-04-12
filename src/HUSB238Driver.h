@@ -29,24 +29,23 @@ typedef enum
 typedef enum
 {
     Not_sel = 0x0,
-    SRC_PDO_5V = 0x1,
-    SRC_PDO_9V = 0x2,
-    SRC_PDO_12V = 0x3,
-    SRC_PDO_15V = 0x8,
-    SRC_PDO_18V = 0x9,
-    SRC_PDO_20V = 0xa,
+    PDO_5V = 0x1,
+    PDO_9V = 0x2,
+    PDO_12V = 0x3,
+    PDO_15V = 0x8,
+    PDO_18V = 0x9,
+    PDO_20V = 0xa,
 } HUSB238_SELECT_Voltage_e;
 
 typedef enum
 {
-    Unattached = 0x0,
-    PDO_5V,
-    PDO_9V,
-    PDO_12V,
-    PDO_15V,
-    PDO_18V,
-    PDO_20V,
-} HUSB238_Contract_Voltage_e;
+    Voltage_5V = 0x0,
+    Voltage_9V,
+    Voltage_12V,
+    Voltage_15V,
+    Voltage_18V,
+    Voltage_20V,
+} HUSB238_Voltage_e;
 
 enum HUSB238_CMD
 {
@@ -60,7 +59,7 @@ typedef union
     struct
     {
         HUSB238_CURRENT_e PD_SRC_CURRENT : 4;
-        HUSB238_Contract_Voltage_e PD_SRC_VOLTAGE : 4;
+        HUSB238_Voltage_e PD_SRC_VOLTAGE : 4;
     } bit;
     uint8_t all;
 } HUSB238_Reg_PD_STATUS0;
@@ -130,24 +129,15 @@ enum HUSB238_reg_addr
 typedef struct
 {
     bool detected;
-    float current;
-    float voltage;
-} HUSB238_DetectedVoltage_t;
-
-typedef struct
-{
-    HUSB238_DetectedVoltage_t PDO_5V;
-    HUSB238_DetectedVoltage_t PDO_9V;
-    HUSB238_DetectedVoltage_t PDO_12V;
-    HUSB238_DetectedVoltage_t PDO_15V;
-    HUSB238_DetectedVoltage_t PDO_18V;
-    HUSB238_DetectedVoltage_t PDO_20V;
-
-} HUSB238_PDOList;
+    HUSB238_CURRENT_e current;
+    HUSB238_Voltage_e voltage;
+} HUSB238_Capability_t;
 
 void HUSB238_Init(int sda, int scl);
-HUSB238_PDOList HUSB238_GetCapabilities();
-void HUSB238_GetCurrentMode(float *voltage, float *current);
+void HUSB238_GetCapabilities(HUSB238_Voltage_e *voltage = nullptr, HUSB238_CURRENT_e *current = nullptr, HUSB238_Capability_t *pdoList = nullptr);
+void HUSB238_GetCurrentMode(HUSB238_Voltage_e *voltage, HUSB238_CURRENT_e *current);
 void HUSB238_SelVoltage(HUSB238_SELECT_Voltage_e voltage);
-
+HUSB238_SELECT_Voltage_e HUSB238_Voltage2PDO(HUSB238_Voltage_e voltage);
+float to_current(HUSB238_CURRENT_e c);
+void HUSB238_HardReset();
 #endif /* __HUSB238_H */

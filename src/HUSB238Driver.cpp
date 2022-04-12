@@ -2,8 +2,8 @@
 #include "driver/i2c.h"
 
 bool initlized = false;
-float EstdU;
-float EstdI;
+HUSB238_SELECT_Voltage_e votlage_Table[] = {Not_sel, PDO_5V, PDO_9V, PDO_12V, PDO_15V, PDO_18V, PDO_20V};
+float current_Table[] = {0.5f, 0.7f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 2.75f, 3.0f, 3.25f, 3.5f, 4.0f, 4.5f, 5.0f};
 
 #define I2C_NUM I2C_NUM_0    /*!< I2C port number for master dev */
 #define I2C_TX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
@@ -53,156 +53,81 @@ int IRAM_ATTR HUSB238_WriteReg(uint8_t slaveAddr, uint8_t writeAddress, uint8_t 
 
     static uint8_t dataCheck;
     HUSB238_I2CReadBytes(slaveAddr, writeAddress, 1, &dataCheck);
-
     if (dataCheck != data)
         return -2;
 
     return ret;
 }
-float bit2current(uint8_t x)
+float to_current(HUSB238_CURRENT_e c)
 {
-    switch (x & 0xf)
+    uint8_t i = c & 0xf;
+    if (i <= PD_5A)
     {
-    case PD_0_5A:
-        return 0.5f;
-    case PD_0_7A:
-        return 0.7f;
-    case PD_1_0A:
-        return 1.0f;
-    case PD_1_25A:
-        return 1.25f;
-    case PD_1_5A:
-        return 1.5f;
-    case PD_1_75A:
-        return 1.75f;
-    case PD_2A:
-        return 2.0f;
-    case PD_2_25A:
-        return 2.25f;
-    case PD_2_5A:
-        return 2.5f;
-    case PD_2_75A:
-        return 2.75f;
-    case PD_3A:
-        return 3.0f;
-    case PD_3_25A:
-        return 3.25f;
-    case PD_3_5A:
-        return 3.5f;
-    case PD_4A:
-        return 4.0f;
-    case PD_4_5A:
-        return 4.5f;
-    case PD_5A:
-        return 5.0f;
+        return current_Table[i];
     }
-    return -1.0f;
+    else
+    {
+        return -1.0f;
+    }
 }
-void HUSB238_ExtractEstd(HUSB238_Reg_PD_STATUS0 status)
+void HUSB238_ExtractEstd(HUSB238_Reg_PD_STATUS0 status, HUSB238_Voltage_e *voltage, HUSB238_CURRENT_e *current)
 {
-    // uint8_t buf = 0;
-    // HUSB238_Reg_PD_STATUS0 *status = (HUSB238_Reg_PD_STATUS0 *)&buf;
-    // HUSB238_I2CReadBytes(HUSB238_I2CAddress, 0x00, 1, &buf);
-    EstdI = bit2current(status.bit.PD_SRC_CURRENT);
-    uint8_t voltage = status.bit.PD_SRC_VOLTAGE;
-    switch (voltage)
+    if (!voltage || !current)
     {
-    case 1:
-        EstdU = 5.0f;
-        break;
-    case 2:
-        EstdU = 9.0f;
-        break;
-    case 3:
-        EstdU = 12.0f;
-        break;
-    case 4:
-        EstdU = 15.0f;
-        break;
-    case 5:
-        EstdU = 18.0f;
-        break;
-    case 6:
-        EstdU = 20.0f;
-        break;
+        return;
     }
-    Serial.printf("%.1fV ", EstdU);
-    Serial.printf("%.2fA\n", EstdI);
-    Serial.println();
+    *current = status.bit.PD_SRC_CURRENT;
+    *voltage = status.bit.PD_SRC_VOLTAGE;
 }
-void HUSB238_GetSrcCap()
+
+void HUSB238_RefreshSrcCap()
 {
     uint8_t cmd = Get_SRC_Cap;
     HUSB238_WriteReg(HUSB238_I2CAddress, Reg_GO_COMMAND, cmd);
-    uint8_t buf = 0;
-    HUSB238_Reg_PD_STATUS0 *status = (HUSB238_Reg_PD_STATUS0 *)&buf;
-    HUSB238_I2CReadBytes(HUSB238_I2CAddress, 0x00, 1, &buf);
-    HUSB238_ExtractEstd(*status);
 }
-void HUSB238_ReadAllReg(HUSB238_reg_t *regs)
+
+void HUSB238_ReadAllReg(uint8_t *regs)
 {
     memset(regs, 0, 10);
     HUSB238_I2CReadBytes(HUSB238_I2CAddress, 0x00, 10, (uint8_t *)regs);
 }
 
-HUSB238_PDOList HUSB238_ExtractCap(HUSB238_reg_t *regs)
+void HUSB238_ExtractCap(uint8_t *regs, HUSB238_Capability_t *pdoList)
 {
-    HUSB238_Reg_SRC_PDO cap;
-    HUSB238_PDOList pdoList;
-    HUSB238_DetectedVoltage_t pdo;
-    for (int i = 0; i < 6; ++i)
+    if (!pdoList || !regs)
     {
-        memcpy(&cap, &regs[i + 2], sizeof(uint8_t));
-        if (cap.bit.SRC_DETECTED)
+        return;
+    }
+    HUSB238_Reg_SRC_PDO *reg;
+    HUSB238_Capability_t cap;
+    for (int i = 0; i < 6; i++)
+    {
+        reg = (HUSB238_Reg_SRC_PDO *)(regs + i + 2);
+        // memcpy(&reg, &regs[i + 2], sizeof(uint8_t));
+        // reg = static_cast<HUSB238_Reg_SRC_PDO>(regs[i + 2]);
+        if (reg->bit.SRC_DETECTED)
         {
-            float current = bit2current(cap.bit.SRC_CURRENT);
-            pdo.detected = true;
-            pdo.current = current;
+            HUSB238_CURRENT_e current = reg->bit.SRC_CURRENT;
+            cap.detected = true;
+            cap.current = current;
+            cap.voltage = static_cast<HUSB238_Voltage_e>(i + 1);
         }
         else
         {
-            pdo.detected = false;
-            pdo.current = 0;
+            cap.detected = false;
         }
-        uint8_t voltage = 0;
-        switch (i)
-        {
-        case 0:
-            pdo.voltage = 5;
-            pdoList.PDO_5V = pdo;
-            break;
-        case 1:
-            pdo.voltage = 9;
-            pdoList.PDO_9V = pdo;
-            break;
-        case 2:
-            pdo.voltage = 12;
-            pdoList.PDO_5V = pdo;
-            break;
-        case 3:
-            pdo.voltage = 15;
-            pdoList.PDO_15V = pdo;
-            break;
-        case 4:
-            pdo.voltage = 18;
-            pdoList.PDO_18V = pdo;
-            break;
-        case 5:
-            pdo.voltage = 20;
-            pdoList.PDO_20V = pdo;
-            break;
-        }
+        pdoList[i] = cap;
     }
-    return pdoList;
 }
 
-HUSB238_PDOList HUSB238_GetCapabilities()
+void HUSB238_GetCapabilities(HUSB238_Voltage_e *voltage, HUSB238_CURRENT_e *current, HUSB238_Capability_t *pdoList)
 {
-    HUSB238_reg_t regs;
-
-    HUSB238_ReadAllReg(&regs);
-    HUSB238_ExtractEstd(regs.PD_STATUS0);
-    return HUSB238_ExtractCap(&regs);
+    uint8_t regs[10];
+    HUSB238_RefreshSrcCap();
+    delay(500);
+    HUSB238_ReadAllReg(regs);
+    HUSB238_ExtractEstd(*(HUSB238_Reg_PD_STATUS0 *)&regs[0], voltage, current);
+    return HUSB238_ExtractCap(regs, pdoList);
 }
 
 void HUSB238_RequestPDO()
@@ -219,11 +144,6 @@ void HUSB238_HardReset()
 
 void HUSB238_Init(int sda, int scl)
 {
-    if (initlized)
-    {
-        return;
-    }
-    delay(1000);
     i2c_port_t i2c_master_port = I2C_NUM;
     i2c_config_t conf;
     conf.mode = I2C_MODE_MASTER;
@@ -235,22 +155,26 @@ void HUSB238_Init(int sda, int scl)
     conf.clk_flags = 0;
     i2c_param_config(i2c_master_port, &conf);
     i2c_driver_install(i2c_master_port, conf.mode, I2C_RX_BUF_DISABLE, I2C_TX_BUF_DISABLE, 0);
-    HUSB238_GetSrcCap();
-    delay(1000);
     initlized = true;
 }
 
-void HUSB238_SelVoltage(HUSB238_SELECT_Voltage_e voltage)
+void HUSB238_SelVoltage(HUSB238_SELECT_Voltage_e pdo)
 {
     HUSB238_Reg_SRC_PDO_SEL targetPDO;
-    targetPDO.all = 0;
-    targetPDO.bit.PDO_SELECT = voltage;
+    targetPDO.all = 0xA;
+    targetPDO.bit.PDO_SELECT = pdo;
     HUSB238_WriteReg(HUSB238_I2CAddress, Reg_SRC_PDO_SEL, targetPDO.all);
     HUSB238_RequestPDO();
 }
 
-void HUSB238_GetCurrentMode(float *voltage, float *current)
+void HUSB238_GetCurrentMode(HUSB238_Voltage_e *voltage, HUSB238_CURRENT_e *current)
 {
-    *voltage = EstdU;
-    *current = EstdI;
+    HUSB238_Reg_PD_STATUS0 status;
+    HUSB238_I2CReadBytes(HUSB238_I2CAddress, 0x00, 1, (uint8_t *)&status);
+    HUSB238_ExtractEstd(status, voltage, current);
+}
+
+HUSB238_SELECT_Voltage_e HUSB238_Voltage2PDO(HUSB238_Voltage_e voltage)
+{
+    return votlage_Table[voltage + 1];
 }
