@@ -176,5 +176,5 @@ void HUSB238_GetCurrentMode(HUSB238_Voltage_e *voltage, HUSB238_CURRENT_e *curre
 
 HUSB238_SELECT_Voltage_e HUSB238_Voltage2PDO(HUSB238_Voltage_e voltage)
 {
-    return votlage_Table[voltage + 1];
+    return votlage_Table[voltage];
 }

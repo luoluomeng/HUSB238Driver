@@ -39,7 +39,8 @@ typedef enum
 
 typedef enum
 {
-    Voltage_5V = 0x0,
+    Voltage_unknown = 0x0,
+    Voltage_5V,
     Voltage_9V,
     Voltage_12V,
     Voltage_15V,
