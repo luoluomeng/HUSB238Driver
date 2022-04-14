@@ -110,12 +110,12 @@ void HUSB238_ExtractCap(uint8_t *regs, HUSB238_Capability_t *pdoList)
             HUSB238_CURRENT_e current = reg->bit.SRC_CURRENT;
             cap.detected = true;
             cap.current = current;
-            cap.voltage = static_cast<HUSB238_Voltage_e>(i + 1);
-        }
+                }
         else
         {
             cap.detected = false;
         }
+        cap.voltage = static_cast<HUSB238_Voltage_e>(i + 1);
         pdoList[i] = cap;
     }
 }
