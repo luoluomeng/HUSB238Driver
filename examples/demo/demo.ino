@@ -11,6 +11,7 @@ void setup()
     Serial.begin(115200);
     Serial.println("start...");
     initPowerAdapter(husb238_sda, husb238_scl);
+    Serial.println(generateStatus());
     setVoltage(Voltage_20V);
     Serial.println("setup end...");
 }
